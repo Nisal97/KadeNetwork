@@ -50,8 +50,19 @@ export default function RegisterPage() {
     // 4. SECURITY & GEOLOCATION STATE
     // =========================================================================
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
     const [geoStatus, setGeoStatus] = useState<string>('');
+
+    // Password criteria validation
+    const isLengthValid = password.length >= 8;
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+    const isPasswordValid = isLengthValid && hasUppercase && hasNumber && hasSpecialChar;
+    const isPasswordMatching = password.length > 0 && confirmPassword.length > 0 && password === confirmPassword;
 
     // =========================================================================
     // VERIFICATION & GEOLOCATION HANDLERS
@@ -128,6 +139,17 @@ export default function RegisterPage() {
         // Guard Clause: Prevent submission if contact channels are unverified
         if (!isMobileVerified || !isEmailVerified) {
             alert('Please verify both your Mobile Number and Email Address before submitting.');
+            return;
+        }
+
+        // Guard Clause: Validate password complexity & confirmation match
+        if (!isPasswordValid) {
+            alert('Please ensure your password has at least 8 characters, 1 uppercase letter, 1 number, and 1 special symbol.');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            alert('Passwords do not match. Please re-enter matching passwords.');
             return;
         }
 
@@ -267,41 +289,55 @@ export default function RegisterPage() {
                                     placeholder="0771234567"
                                     value={contactNo1}
                                     onChange={(e) => setContactNo1(e.target.value)}
-                                    className="flex-1 px-3.5 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none disabled:bg-slate-100 transition"
+                                    className="flex-1 px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed transition"
                                 />
                                 {!isMobileVerified ? (
                                     <button
                                         type="button"
                                         onClick={handleSendMobileOtp}
-                                        className="bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition cursor-pointer"
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition shadow-xs cursor-pointer whitespace-nowrap"
                                     >
                                         {isMobileOtpSent ? 'Resend OTP' : 'Send OTP'}
                                     </button>
                                 ) : (
-                                    <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center">
+                                    <span className="bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold px-3.5 py-2.5 rounded-lg flex items-center gap-1 whitespace-nowrap shadow-xs">
                                         ✓ Verified
                                     </span>
                                 )}
                             </div>
                         </div>
 
-                        {/* Mobile OTP Input (Shown only after sending OTP) */}
+                        {/* Mobile OTP Input Popup / Box (Shown only after sending OTP and before verification) */}
                         {isMobileOtpSent && !isMobileVerified && (
-                            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex gap-2 items-center">
-                                <input
-                                    type="text"
-                                    placeholder="Enter 6-digit Mobile OTP"
-                                    value={mobileOtp}
-                                    onChange={(e) => setMobileOtp(e.target.value)}
-                                    className="flex-1 px-3 py-1.5 rounded border border-slate-300 text-sm outline-none bg-white"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleVerifyMobileOtp}
-                                    className="bg-emerald-600 text-white text-xs font-semibold px-3 py-2 rounded hover:bg-emerald-700 transition cursor-pointer"
-                                >
-                                    Verify Code
-                                </button>
+                            <div className="p-4 bg-indigo-50/80 border border-indigo-200 rounded-xl space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-xs font-bold text-indigo-950 uppercase">
+                                        Enter Mobile Verification Code (OTP) <span className="text-red-500">*</span>
+                                    </label>
+                                    <span className="text-[11px] text-indigo-700 font-medium">
+                                        SMS sent to {contactNo1}
+                                    </span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        maxLength={6}
+                                        placeholder="Enter 6-digit OTP (e.g. 123456)"
+                                        value={mobileOtp}
+                                        onChange={(e) => setMobileOtp(e.target.value)}
+                                        className="flex-1 px-3.5 py-2 rounded-lg border border-indigo-200 text-sm tracking-widest font-mono text-center focus:ring-2 focus:ring-indigo-600 outline-none bg-white shadow-xs"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleVerifyMobileOtp}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                    >
+                                        <span>✓</span> Verify OTP
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-slate-500">
+                                    💡 Test code: <strong className="text-indigo-700 font-mono font-bold">123456</strong>. Click <strong>Verify OTP</strong> to lock & verify this contact number.
+                                </p>
                             </div>
                         )}
 
@@ -343,68 +379,185 @@ export default function RegisterPage() {
                                     placeholder="owner@kade.lk"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="flex-1 px-3.5 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none disabled:bg-slate-100 transition"
+                                    className="flex-1 px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed transition"
                                 />
                                 {!isEmailVerified ? (
                                     <button
                                         type="button"
                                         onClick={handleSendEmailOtp}
-                                        className="bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition cursor-pointer"
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition shadow-xs cursor-pointer whitespace-nowrap"
                                     >
-                                        {isEmailOtpSent ? 'Resend Code' : 'Send Code'}
+                                        {isEmailOtpSent ? 'Resend OTP' : 'Send OTP'}
                                     </button>
                                 ) : (
-                                    <span className="bg-emerald-100 text-emerald-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center">
+                                    <span className="bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold px-3.5 py-2.5 rounded-lg flex items-center gap-1 whitespace-nowrap shadow-xs">
                                         ✓ Verified
                                     </span>
                                 )}
                             </div>
                         </div>
 
-                        {/* Email OTP Input (Shown only after sending OTP) */}
+                        {/* Email OTP Input Popup / Box (Shown only after sending OTP and before verification) */}
                         {isEmailOtpSent && !isEmailVerified && (
-                            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex gap-2 items-center">
-                                <input
-                                    type="text"
-                                    placeholder="Enter 6-digit Email Code"
-                                    value={emailOtp}
-                                    onChange={(e) => setEmailOtp(e.target.value)}
-                                    className="flex-1 px-3 py-1.5 rounded border border-slate-300 text-sm outline-none bg-white"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleVerifyEmailOtp}
-                                    className="bg-emerald-600 text-white text-xs font-semibold px-3 py-2 rounded hover:bg-emerald-700 transition cursor-pointer"
-                                >
-                                    Verify Code
-                                </button>
+                            <div className="p-4 bg-indigo-50/80 border border-indigo-200 rounded-xl space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-xs font-bold text-indigo-950 uppercase">
+                                        Enter Email Verification Code (OTP) <span className="text-red-500">*</span>
+                                    </label>
+                                    <span className="text-[11px] text-indigo-700 font-medium">
+                                        OTP sent to {email}
+                                    </span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        maxLength={6}
+                                        placeholder="Enter 6-digit OTP (e.g. 654321)"
+                                        value={emailOtp}
+                                        onChange={(e) => setEmailOtp(e.target.value)}
+                                        className="flex-1 px-3.5 py-2 rounded-lg border border-indigo-200 text-sm tracking-widest font-mono text-center focus:ring-2 focus:ring-indigo-600 outline-none bg-white shadow-xs"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleVerifyEmailOtp}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                    >
+                                        <span>✓</span> Verify OTP
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-slate-500">
+                                    💡 Test code: <strong className="text-indigo-700 font-mono font-bold">654321</strong>. Click <strong>Verify OTP</strong> to lock & verify this email.
+                                </p>
                             </div>
                         )}
 
-                        {/* Account Password */}
-                        <div>
-                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                                Password <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="password"
-                                required
-                                minLength={8}
-                                placeholder="At least 8 characters"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-3.5 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none transition"
-                            />
+                        {/* =========================================================================
+                            PASSWORD & CONFIRM PASSWORD WITH CRITERIA & PEEK-TO-VIEW
+                            ========================================================================= */}
+                        <div className="space-y-3 pt-1">
+                            {/* Password Requirements Helper Notice (displayed before typing) */}
+                            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-600">
+                                <span className="font-bold text-slate-800 block">
+                                    🔒 Password Security Requirements:
+                                </span>
+                                <div className="grid grid-cols-2 gap-1.5 text-[11px] pt-1">
+                                    <div className={`flex items-center gap-1.5 transition-colors ${isLengthValid ? 'text-emerald-700 font-bold' : 'text-slate-500'}`}>
+                                        <span>{isLengthValid ? '✓' : '○'}</span>
+                                        <span>At least 8 characters</span>
+                                    </div>
+                                    <div className={`flex items-center gap-1.5 transition-colors ${hasUppercase ? 'text-emerald-700 font-bold' : 'text-slate-500'}`}>
+                                        <span>{hasUppercase ? '✓' : '○'}</span>
+                                        <span>1 Uppercase letter (A-Z)</span>
+                                    </div>
+                                    <div className={`flex items-center gap-1.5 transition-colors ${hasNumber ? 'text-emerald-700 font-bold' : 'text-slate-500'}`}>
+                                        <span>{hasNumber ? '✓' : '○'}</span>
+                                        <span>1 Number (0-9)</span>
+                                    </div>
+                                    <div className={`flex items-center gap-1.5 transition-colors ${hasSpecialChar ? 'text-emerald-700 font-bold' : 'text-slate-500'}`}>
+                                        <span>{hasSpecialChar ? '✓' : '○'}</span>
+                                        <span>1 Special symbol (!@#$...)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Main Password Input */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                                    Password <span className="text-red-500">*</span>
+                                </label>
+                                <div className="relative flex items-center">
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        required
+                                        minLength={8}
+                                        placeholder="Create a strong password"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full pl-3.5 pr-11 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none transition"
+                                    />
+                                    {/* Hold-to-View Password Button */}
+                                    <button
+                                        type="button"
+                                        title="Click and hold to view password"
+                                        onMouseDown={() => setShowPassword(true)}
+                                        onMouseUp={() => setShowPassword(false)}
+                                        onMouseLeave={() => setShowPassword(false)}
+                                        onTouchStart={() => setShowPassword(true)}
+                                        onTouchEnd={() => setShowPassword(false)}
+                                        className="absolute right-3 text-slate-400 hover:text-slate-600 select-none p-1 cursor-pointer"
+                                    >
+                                        {showPassword ? '👁️' : '🙈'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Re-type / Confirm Password Input (Appears dynamically once user starts entering password) */}
+                            {password.length > 0 && (
+                                <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                                        Re-type Password <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="relative flex items-center">
+                                        <input
+                                            type={showConfirmPassword ? 'text' : 'password'}
+                                            required
+                                            placeholder="Re-enter your password"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            className={`w-full pl-3.5 pr-11 py-2.5 rounded-lg border text-sm outline-none transition ${
+                                                confirmPassword.length > 0
+                                                    ? isPasswordMatching
+                                                        ? 'border-emerald-400 focus:ring-2 focus:ring-emerald-500'
+                                                        : 'border-rose-400 focus:ring-2 focus:ring-rose-500'
+                                                    : 'border-slate-300 focus:ring-2 focus:ring-indigo-600'
+                                            }`}
+                                        />
+                                        {/* Hold-to-View Confirm Password Button */}
+                                        <button
+                                            type="button"
+                                            title="Click and hold to view password"
+                                            onMouseDown={() => setShowConfirmPassword(true)}
+                                            onMouseUp={() => setShowConfirmPassword(false)}
+                                            onMouseLeave={() => setShowConfirmPassword(false)}
+                                            onTouchStart={() => setShowConfirmPassword(true)}
+                                            onTouchEnd={() => setShowConfirmPassword(false)}
+                                            className="absolute right-3 text-slate-400 hover:text-slate-600 select-none p-1 cursor-pointer"
+                                        >
+                                            {showConfirmPassword ? '👁️' : '🙈'}
+                                        </button>
+                                    </div>
+
+                                    {/* Password Matching Live Indicator */}
+                                    {confirmPassword.length > 0 && (
+                                        <div className="text-[11px] pt-0.5">
+                                            {isPasswordMatching ? (
+                                                <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                                                    ✓ Passwords match
+                                                </span>
+                                            ) : (
+                                                <span className="text-rose-600 font-semibold flex items-center gap-1">
+                                                    ✕ Passwords do not match
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     {/* =========================================================================
                         SUBMIT BUTTON
-                        Protected by verification checks.
+                        Protected by mobile, email, and password match verifications.
                         ========================================================================= */}
                     <button
                         type="submit"
-                        disabled={!isMobileVerified || !isEmailVerified}
+                        disabled={
+                            !isMobileVerified ||
+                            !isEmailVerified ||
+                            !isPasswordValid ||
+                            !isPasswordMatching
+                        }
                         className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg hover:bg-indigo-700 transition shadow-sm disabled:bg-slate-300 disabled:cursor-not-allowed mt-4 cursor-pointer"
                     >
                         Complete Registration
