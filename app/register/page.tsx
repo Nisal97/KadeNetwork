@@ -2,30 +2,37 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabaseClient';
 import LocationPickerModal from '../components/LocationPickerModal';
 
 /**
  * RegisterPage Component
  * ----------------------
- * Full shop registration and onboarding form for KadeNetwork.
+ * Full shop registration and onboarding form for KadeNetwork with Supabase Backend.
  *
  * Key Functions:
- * 1. Collects Business & Shop Details (Shop Name, Owner Name, Physical Address).
- * 2. Integrates Google Maps Modal for pinpoint GPS accuracy (latitude & longitude) and Places Autocomplete.
- * 3. Two-Channel Verification:
- *    - Mobile SMS OTP Verification (prevents fraudulent accounts).
- *    - Email OTP Verification (ensures valid credentials).
- * 4. Password and Security setup.
- * 5. Guard Clause: Disables form submission until both Mobile and Email are verified.
+ * 1. Business Details: Shop Name, Owner Name, Complex / Location Cluster, Physical Address.
+ * 2. Precision Geolocation: Interactive Google Maps Pin Picker with Places Autocomplete.
+ * 3. Mobile SMS OTP Verification (Mock code: 123456) with auto-locking input.
+ * 4. Email OTP Verification (Mock code: 654321) with auto-locking input.
+ * 5. Password Security & Hold-to-View Toggle + Dynamic Re-type Password Match.
+ * 6. Backend Integration: Registers user in Supabase Auth & inserts record into `public.shops`.
  */
 export default function RegisterPage() {
+    const router = useRouter();
+
     // =========================================================================
-    // 1. BUSINESS & SHOP STATE
+    // 1. BUSINESS & LOCATION STATE
     // =========================================================================
     const [shopName, setShopName] = useState('');
     const [ownerName, setOwnerName] = useState('');
+    const [buildingName, setBuildingName] = useState('Unity Plaza');
     const [address, setAddress] = useState('');
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+    const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+    const [geoStatus, setGeoStatus] = useState<string>('');
+    const [loading, setLoading] = useState(false);
 
     // =========================================================================
     // 2. MOBILE VERIFICATION STATE (Primary Contact)
@@ -47,14 +54,12 @@ export default function RegisterPage() {
     const [isEmailVerified, setIsEmailVerified] = useState(false);
 
     // =========================================================================
-    // 4. SECURITY & GEOLOCATION STATE
+    // 4. SECURITY & PASSWORD STATE
     // =========================================================================
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
-    const [geoStatus, setGeoStatus] = useState<string>('');
 
     // Password criteria validation
     const isLengthValid = password.length >= 8;
@@ -129,11 +134,14 @@ export default function RegisterPage() {
     };
 
     /**
-     * Main Form Submit Handler
-     * -------------------------
-     * Enforces required verification checks and constructs the final merchant payload.
+     * Main Form Submit Handler (Supabase Integration)
+     * ------------------------------------------------
+     * 1. Validates verifications & password match.
+     * 2. Registers the user via supabase.auth.signUp.
+     * 3. Inserts the shop profile into public.shops table.
+     * 4. Redirects to /dashboard on success.
      */
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         // Guard Clause: Prevent submission if contact channels are unverified
@@ -153,24 +161,60 @@ export default function RegisterPage() {
             return;
         }
 
-        const payload = {
-            shopName,
-            ownerName,
-            contactNo1,
-            contactNo2: contactNo2 || null,
-            address,
-            email,
-            password,
-            latitude: coordinates?.lat || null,
-            longitude: coordinates?.lng || null,
-            isMobileVerified,
-            isEmailVerified,
-        };
+        setLoading(true);
 
-        console.log('Registration Payload:', payload);
-        // Future backend integration:
-        // await supabase.from('shops').insert([payload]);
-        alert('Shop Registration Complete! Next step: Supabase API payload integration.');
+        try {
+            // 1. Create account in Supabase Auth
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email,
+                password,
+            });
+
+            if (authError) throw authError;
+
+            // If session is null, email confirmation is still enabled in Supabase.
+            // The shop insert will fail because auth.uid() returns null without a session.
+            if (!authData.session) {
+                throw new Error(
+                    'Account created but email confirmation is required. Please disable "Enable email confirmations" in your Supabase Authentication settings so the shop profile can be saved immediately.'
+                );
+            }
+
+            if (authData.user) {
+                // 2. Insert Shop Profile linking to auth.user.id
+                const { error: shopError } = await supabase.from('shops').insert([
+                    {
+                        id: authData.user.id,
+                        shop_name: shopName,
+                        owner_name: ownerName,
+                        contact_no_1: contactNo1,
+                        contact_no_2: contactNo2 || null,
+                        address,
+                        building_name: buildingName,
+                        latitude: coordinates?.lat || null,
+                        longitude: coordinates?.lng || null,
+                    },
+                ]);
+
+                if (shopError) throw shopError;
+
+                alert('Shop registered successfully!');
+                router.push('/dashboard');
+            }
+        } catch (error: unknown) {
+            // Log full error object for debugging
+            console.error('Registration error full details:', error);
+            // Supabase errors are plain objects with a .message property, not Error instances
+            let message = 'An unexpected error occurred';
+            if (error instanceof Error) {
+                message = error.message;
+            } else if (typeof error === 'object' && error !== null && 'message' in error) {
+                message = String((error as { message: unknown }).message);
+            }
+            alert(`Registration failed: ${message}`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -222,10 +266,28 @@ export default function RegisterPage() {
                             </div>
                         </div>
 
+                        {/* Complex / Location Cluster Selector */}
+                        <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                                Complex / Location Cluster <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                value={buildingName}
+                                onChange={(e) => setBuildingName(e.target.value)}
+                                className="w-full px-3.5 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none bg-white transition"
+                            >
+                                <option value="Unity Plaza">Unity Plaza (Colombo 04)</option>
+                                <option value="Majestic City">Majestic City (Colombo 04)</option>
+                                <option value="Liberty Plaza">Liberty Plaza (Colombo 03)</option>
+                                <option value="Pettah Market">Pettah Market Cluster</option>
+                                <option value="Other">Other / Standalone Store</option>
+                            </select>
+                        </div>
+
                         {/* Physical Address Textarea */}
                         <div>
                             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                                Store Address / Location <span className="text-red-500">*</span>
+                                Store Address / Floor Details <span className="text-red-500">*</span>
                             </label>
                             <textarea
                                 required
@@ -556,11 +618,12 @@ export default function RegisterPage() {
                             !isMobileVerified ||
                             !isEmailVerified ||
                             !isPasswordValid ||
-                            !isPasswordMatching
+                            !isPasswordMatching ||
+                            loading
                         }
-                        className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg hover:bg-indigo-700 transition shadow-sm disabled:bg-slate-300 disabled:cursor-not-allowed mt-4 cursor-pointer"
+                        className="w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg hover:bg-indigo-700 transition shadow-sm disabled:bg-slate-300 disabled:cursor-not-allowed mt-4 flex items-center justify-center gap-2 cursor-pointer"
                     >
-                        Complete Registration
+                        {loading ? 'Creating Shop Account...' : 'Complete Registration'}
                     </button>
                 </form>
 

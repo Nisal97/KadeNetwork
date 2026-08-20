@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import NavBar from "./components/NavBar";
 import "./globals.css";
 
 /**
@@ -17,7 +17,9 @@ export const metadata: Metadata = {
  * The root layout wraps all pages in the application.
  * It provides:
  * 1. Global typography and background styling (via Tailwind CSS).
- * 2. Sticky/Top Header Navigation with branding and quick links.
+ * 2. Sticky/Top Header Navigation via <NavBar> (auth-aware client component).
+ *    - Guest: shows "Shop Login" and "Register Shop" buttons.
+ *    - Logged in: shows "My Account" and "Sign Out" buttons.
  * 3. Dynamic page content injection via `{children}`.
  * 4. Global footer with copyright information.
  */
@@ -30,42 +32,10 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased">
         {/* =========================================================================
-            HEADER / TOP NAVIGATION BAR
-            Provides brand identification and top-level navigation routes.
+            HEADER / TOP NAVIGATION BAR (auth-aware)
+            Switches between guest and authenticated nav items based on session.
             ========================================================================= */}
-        <header className="border-b border-slate-200 bg-white shadow-xs sticky top-0 z-40">
-          <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-            {/* Brand Logo & Name */}
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-xl font-bold text-slate-800 hover:opacity-90 transition"
-            >
-              <span className="bg-indigo-600 text-white px-2.5 py-1 rounded-lg text-sm font-extrabold shadow-xs">
-                KN
-              </span>
-              <span>KadeNetwork</span>
-            </Link>
-
-            {/* Navigation Action Links */}
-            <nav className="flex items-center gap-4">
-              {/* Existing Merchant Login */}
-              <Link
-                href="/login"
-                className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition px-2 py-1"
-              >
-                Shop Login
-              </Link>
-
-              {/* Shop Registration CTA */}
-              <Link
-                href="/register"
-                className="text-sm font-semibold bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition shadow-xs"
-              >
-                Register Shop
-              </Link>
-            </nav>
-          </div>
-        </header>
+        <NavBar />
 
         {/* =========================================================================
             MAIN CONTENT CONTAINER
