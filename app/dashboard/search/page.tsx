@@ -60,6 +60,7 @@ interface SearchResultItem {
     item_name: string;
     brand: string | null;
     price: number;
+    quantity: number;
     description: string | null;
     image_url: string | null;
     is_active: boolean;
@@ -177,7 +178,7 @@ export default function SearchNetworkStockPage() {
         const { data: itemsData, error } = await supabase
             .from('inventory')
             .select(
-                'id, shop_id, category, item_name, brand, price, description, image_url, is_active'
+                'id, shop_id, category, item_name, brand, price, description, image_url, is_active, quantity'
             )
             .eq('is_active', true);
 
@@ -197,23 +198,29 @@ export default function SearchNetworkStockPage() {
             (shopsData ?? []).map((s) => [s.id, s as ShopInfo])
         );
 
-        // 3. Merge shop info into each item
+        // 3. Merge shop info into each item.
+        //    If the `quantity` column doesn't exist yet, it will be undefined —
+        //    treat missing quantity as 0 (sold out) so it's excluded from results.
         let filtered: SearchResultItem[] = (itemsData ?? []).map((item) => ({
             ...item,
+            quantity: (item as { quantity?: number }).quantity ?? 0,
             shops: shopMap.get(item.shop_id) ? [shopMap.get(item.shop_id)!] : null,
         }));
 
-        // 4. Exclude the current user's own shop items
+        // 4. Only show items that are in stock (quantity > 0)
+        filtered = filtered.filter((item) => item.quantity > 0);
+
+        // 5. Exclude the current user's own shop items
         if (shopId) {
             filtered = filtered.filter((item) => item.shop_id !== shopId);
         }
 
-        // 5. Category filter
+        // 6. Category filter
         if (category !== 'All') {
             filtered = filtered.filter((item) => item.category === category);
         }
 
-        // 6. Keyword search on item name + brand (case-insensitive, match ANY keyword)
+        // 7. Keyword search on item name + brand (case-insensitive, match ANY keyword)
         const keywords = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
         if (keywords.length > 0) {
             filtered = filtered.filter((item) => {
@@ -222,7 +229,7 @@ export default function SearchNetworkStockPage() {
             });
         }
 
-        // 7. Radius filter (Haversine distance from my shop)
+        // 8. Radius filter (Haversine distance from my shop)
         if (radius > 0 && myLocation) {
             filtered = filtered.filter((item) => {
                 const shop = item.shops?.[0];

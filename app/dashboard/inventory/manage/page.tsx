@@ -27,12 +27,16 @@ import { supabase } from '@/lib/supabaseClient';
  *   item_name TEXT NOT NULL,
  *   brand TEXT,
  *   price NUMERIC(10,2) NOT NULL,
+ *   quantity INTEGER NOT NULL DEFAULT 0,
  *   description TEXT,
  *   image_url TEXT,
  *   is_active BOOLEAN NOT NULL DEFAULT TRUE,
  *   created_at TIMESTAMPTZ DEFAULT NOW(),
  *   updated_at TIMESTAMPTZ DEFAULT NOW()
  * );
+ *
+ * If you already created the table without `quantity`, run:
+ *   ALTER TABLE public.inventory ADD COLUMN quantity INTEGER NOT NULL DEFAULT 0;
  * ALTER TABLE public.inventory ENABLE ROW LEVEL SECURITY;
  * CREATE POLICY "own_inventory" ON public.inventory FOR ALL TO authenticated
  *   USING (shop_id = auth.uid()) WITH CHECK (shop_id = auth.uid());
@@ -52,6 +56,7 @@ interface InventoryItem {
     item_name: string;
     brand: string | null;
     price: number;
+    quantity: number;
     description: string | null;
     image_url: string | null;
     is_active: boolean;
@@ -63,6 +68,7 @@ interface FormState {
     item_name: string;
     brand: string;
     price: string;
+    quantity: string;
     description: string;
     is_active: boolean;
 }
@@ -92,6 +98,7 @@ const DEFAULT_FORM: FormState = {
     item_name: '',
     brand: '',
     price: '',
+    quantity: '1',
     description: '',
     is_active: true,
 };
@@ -162,6 +169,7 @@ export default function ManageInventoryPage() {
             item_name: item.item_name,
             brand: item.brand ?? '',
             price: String(item.price),
+            quantity: String(item.quantity),
             description: item.description ?? '',
             is_active: item.is_active,
         });
@@ -226,6 +234,7 @@ export default function ManageInventoryPage() {
             item_name: form.item_name.trim(),
             brand: form.brand.trim() || null,
             price: parseFloat(form.price),
+            quantity: Math.max(0, parseInt(form.quantity) || 0),
             description: form.description.trim() || null,
             image_url: imageUrl,
             is_active: form.is_active,
@@ -435,6 +444,23 @@ export default function ManageInventoryPage() {
                                     />
                                 </div>
                             </div>
+
+                            {/* Quantity */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                                    Quantity <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    required
+                                    min={0}
+                                    step="1"
+                                    placeholder="0"
+                                    value={form.quantity}
+                                    onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+                                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-600 outline-none transition"
+                                />
+                            </div>
                         </div>
 
                         {/* Description */}
@@ -624,13 +650,20 @@ export default function ManageInventoryPage() {
                                     {/* Name */}
                                     <p className="font-bold text-slate-900 text-sm truncate">{item.item_name}</p>
 
-                                    {/* Brand + Price */}
-                                    <div className="flex items-center gap-3 mt-0.5">
+                                    {/* Brand + Price + Quantity */}
+                                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                                         {item.brand && (
                                             <span className="text-xs text-slate-500">{item.brand}</span>
                                         )}
                                         <span className="text-sm font-extrabold text-indigo-700">
                                             Rs. {Number(item.price).toLocaleString()}
+                                        </span>
+                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                            item.quantity > 0
+                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                                : 'bg-rose-50 text-rose-600 border border-rose-100'
+                                        }`}>
+                                            {item.quantity > 0 ? `${item.quantity} in stock` : 'Out of stock'}
                                         </span>
                                     </div>
 
